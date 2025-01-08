@@ -1,11 +1,15 @@
 package com.example.userservice.services;
 
+import com.example.userservice.DTO.SendEmaiDTO;
 import com.example.userservice.Repo.TokenRepo;
 import com.example.userservice.Repo.UserRepo;
 import com.example.userservice.models.Token;
 import com.example.userservice.models.User;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -19,13 +23,17 @@ public class UserService implements IUserService {
     private UserRepo userRepo;
     private BCryptPasswordEncoder bCryptPasswordEncoder;
     private TokenRepo tokenRepo;
+    private KafkaTemplate<String, String> kafkaTemplate;
+    private ObjectMapper objectMapper;
 
     /* Constructor */
     public UserService(UserRepo userRepo, BCryptPasswordEncoder bCryptPasswordEncoder,
-                       TokenRepo tokenRepo) {
+                       TokenRepo tokenRepo, KafkaTemplate kafkaTemplate) {
         this.userRepo = userRepo;
         this.bCryptPasswordEncoder = bCryptPasswordEncoder;
         this.tokenRepo = tokenRepo;
+        this.kafkaTemplate = kafkaTemplate;
+        this.objectMapper = new ObjectMapper();
     }
 
     @Override
@@ -41,6 +49,24 @@ public class UserService implements IUserService {
         user.setEmail(email);
         user.setUserName(name);
         user.setHashedPassword(bCryptPasswordEncoder.encode(password));
+
+        /* Code for kafka */
+        SendEmaiDTO sendEmaiDTO = new SendEmaiDTO();
+        sendEmaiDTO.setFromEmail("santhoshkmr742@gmail.com");
+        sendEmaiDTO.setToEmail("santhoshkmr742@gmail.com");
+        sendEmaiDTO.setSubject("Test Email");
+        sendEmaiDTO.setBody("We are testing Kafka connection..");
+
+        String sendEmailDTOString = null;
+
+        try {
+            sendEmailDTOString = objectMapper.writeValueAsString(sendEmaiDTO);
+        } catch (JsonProcessingException e) {
+            System.out.println("Error in converting to String");
+        }
+
+        kafkaTemplate.send("emailsend", sendEmailDTOString);
+
         /*return the user to the controller*/
         return userRepo.save(user);
     }
